@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
+prometheus = "0.13"
+axum = "0.7"
+once_cell = "1.19"
+libc = "0.2.180"
