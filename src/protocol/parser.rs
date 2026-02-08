@@ -17,7 +17,8 @@ pub async fn process(input: String, db: &Db) -> String {
         "EXISTS" => commands::exists::execute(parts, db).await,
         "FLUSHALL" => commands::flushall::execute(parts, db).await,
         "INCR" => commands::incr::execute(parts, db).await,
-        
+        "EXPIRE" => commands::expire::execute(parts, db).await,
+
         _ => "ERR unknown command\n".into(),
     }
 }

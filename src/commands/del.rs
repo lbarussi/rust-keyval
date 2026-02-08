@@ -7,9 +7,7 @@ pub async fn execute(parts: Vec<&str>, db: &Db) -> String {
 
     let mut db = db.lock().await;
 
-    let removed: Option<String> = db.remove(parts[1]);
-
-    match removed {
+    match db.remove(parts[1]) {
         Some(_) => "1\n".into(),
         None => "0\n".into(),
     }
