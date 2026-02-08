@@ -394,6 +394,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "libc",
+ "memchr",
  "once_cell",
  "prometheus",
  "tokio",
