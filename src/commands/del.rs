@@ -1,15 +1,14 @@
 use crate::db::storage::Db;
+use crate::protocol::resp::encoder::RespValue;
 
-pub async fn execute(parts: Vec<String>, db: &Db) -> String {
+pub async fn execute(parts: Vec<String>, db: &Db) -> RespValue {
     if parts.len() < 2 {
-        return "ERR usage DEL key\n".into();
+        return RespValue::Error("ERR usage DEL key".into());
     }
 
     let key = &parts[1];
-
     let mut db = db.lock().await;
-    match db.remove(key) {
-        Some(_) => "1\n".into(),
-        None => "0\n".into(),
-    }
+
+    let deleted = if db.remove(key).is_some() { 1 } else { 0 };
+    RespValue::Integer(deleted)
 }

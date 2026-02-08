@@ -7,7 +7,7 @@ pub fn parse_resp_one(input: &[u8]) -> Result<Option<(Vec<String>, usize)>, Stri
         while *i + 1 < input.len() {
             if input[*i] == b'\r' && input[*i + 1] == b'\n' {
                 let line = &input[start..*i];
-                *i += 2; // consome \r\n
+                *i += 2;
                 return Some(line);
             }
             *i += 1;
@@ -17,7 +17,6 @@ pub fn parse_resp_one(input: &[u8]) -> Result<Option<(Vec<String>, usize)>, Stri
         None
     }
 
-    // header: *<n>\r\n
     let header = match read_line(input, &mut i) {
         Some(l) => l,
         None => return Ok(None),
@@ -35,7 +34,6 @@ pub fn parse_resp_one(input: &[u8]) -> Result<Option<(Vec<String>, usize)>, Stri
     let mut parts = Vec::with_capacity(n);
 
     for _ in 0..n {
-        // $<len>\r\n
         let bulk_hdr = match read_line(input, &mut i) {
             Some(l) => l,
             None => return Ok(None),
@@ -55,14 +53,12 @@ pub fn parse_resp_one(input: &[u8]) -> Result<Option<(Vec<String>, usize)>, Stri
         }
 
         if len_i64 == -1 {
-            // Null bulk (para argumentos: vamos representar como string vazia por enquanto)
             parts.push(String::new());
             continue;
         }
 
         let len = len_i64 as usize;
 
-        // precisa ter len bytes + \r\n
         if i + len + 2 > input.len() {
             return Ok(None);
         }
@@ -78,5 +74,5 @@ pub fn parse_resp_one(input: &[u8]) -> Result<Option<(Vec<String>, usize)>, Stri
         parts.push(String::from_utf8_lossy(data).to_string());
     }
 
-    Ok(Some((parts, i))) // i = bytes consumidos
+    Ok(Some((parts, i)))
 }

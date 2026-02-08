@@ -1,10 +1,10 @@
 use std::time::Instant;
-
 use crate::db::storage::Db;
+use crate::protocol::resp::encoder::RespValue;
 
-pub async fn execute(parts: Vec<String>, db: &Db) -> String {
+pub async fn execute(parts: Vec<String>, db: &Db) -> RespValue {
     if parts.len() < 2 {
-        return "ERR usage GET key\n".into();
+        return RespValue::Error("ERR usage GET key".into());
     }
 
     let key = &parts[1];
@@ -14,11 +14,11 @@ pub async fn execute(parts: Vec<String>, db: &Db) -> String {
         if let Some(exp) = entry.expire_at {
             if Instant::now() > exp {
                 db.remove(key);
-                return "NULL\n".into();
+                return RespValue::Bulk(None);
             }
         }
-        return format!("{}\n", entry.value);
+        return RespValue::Bulk(Some(entry.value.clone().into_bytes()));
     }
 
-    "NULL\n".into()
+    RespValue::Bulk(None)
 }

@@ -1,16 +1,13 @@
 use crate::db::storage::Db;
+use crate::protocol::resp::encoder::RespValue;
 
-pub async fn execute(parts: Vec<String>, db: &Db) -> String {
+pub async fn execute(parts: Vec<String>, db: &Db) -> RespValue {
     if parts.len() < 2 {
-        return "ERR usage EXISTS key\n".into();
+        return RespValue::Error("ERR usage EXISTS key".into());
     }
 
     let key = &parts[1];
     let db = db.lock().await;
 
-    if db.contains_key(key) {
-        "1\n".into()
-    } else {
-        "0\n".into()
-    }
+    RespValue::Integer(if db.contains_key(key) { 1 } else { 0 })
 }

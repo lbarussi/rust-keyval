@@ -38,11 +38,14 @@ fn main() {
     let clients = 50;
     let ops_per_client = 200;
 
-    // limpa contador global
+
     {
         let mut s = TcpStream::connect(host).unwrap();
         s.set_nodelay(true).unwrap();
-        let _ = send_and_read_all(&mut s, b"*1\r\n$8\r\nFLUSHALL\r\n");
+        let r = send_and_read_all(&mut s, b"*1\r\n$8\r\nFLUSHALL\r\n");
+        if !r.contains("+OK\r\n") {
+            panic!("bad FLUSHALL resp: {:?}", r);
+        }
     }
 
     let start = Instant::now();
@@ -55,13 +58,13 @@ fn main() {
             s.set_nodelay(true).unwrap();
 
             for i in 0..ops_per_client {
-                // INCR global counter
+
                 let r = send_and_read_all(&mut s, b"*2\r\n$4\r\nINCR\r\n$3\r\nctr\r\n");
-                if r.contains("ERR") || r.is_empty() {
+                if r.contains("-ERR") || r.is_empty() || !r.contains(':') {
                     panic!("client {id} op {i}: bad INCR resp: {:?}", r);
                 }
 
-                // SET/GET chave por cliente
+
                 let key = format!("k{id}");
                 let val = format!("v{i}");
 
@@ -70,7 +73,7 @@ fn main() {
                     key.len(), key, val.len(), val
                 );
                 let r = send_and_read_all(&mut s, set.as_bytes());
-                if !r.contains("OK") {
+                if !r.contains("+OK\r\n") {
                     panic!("client {id} op {i}: bad SET resp: {:?}", r);
                 }
 
@@ -79,8 +82,14 @@ fn main() {
                     key.len(), key
                 );
                 let r = send_and_read_all(&mut s, get.as_bytes());
-                if !r.contains(&val) {
-                    panic!("client {id} op {i}: bad GET resp: {:?} (expected {})", r, val);
+
+
+                let expected_bulk = format!("${}\r\n{}\r\n", val.len(), val);
+                if !r.contains(&expected_bulk) {
+                    panic!(
+                        "client {id} op {i}: bad GET resp: {:?} (expected {:?})",
+                        r, expected_bulk
+                    );
                 }
             }
         }));
@@ -90,15 +99,18 @@ fn main() {
         h.join().unwrap();
     }
 
-    // valida contador final = clients * ops_per_client
+
     let expected = clients * ops_per_client;
     let mut s = TcpStream::connect(host).unwrap();
     s.set_nodelay(true).unwrap();
     let r = send_and_read_all(&mut s, b"*2\r\n$3\r\nGET\r\n$3\r\nctr\r\n");
 
     println!("FINAL ctr: {:?}", r);
-    if !r.contains(&expected.to_string()) {
-        eprintln!("FAIL: expected ctr to contain {}", expected);
+
+
+    let expected_bulk = format!("${}\r\n{}\r\n", expected.to_string().len(), expected);
+    if !r.contains(&expected_bulk) {
+        eprintln!("FAIL: expected ctr bulk {:?}", expected_bulk);
         std::process::exit(1);
     }
 

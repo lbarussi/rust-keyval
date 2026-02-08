@@ -18,25 +18,22 @@ pub async fn handle(mut stream: TcpStream, db: Db) {
 
         acc.extend_from_slice(&buffer[..n]);
 
-        // Processa QUANTOS comandos completos existirem dentro do buffer
         loop {
             if acc.is_empty() {
                 break;
             }
 
-            // RESP only (prioridade RESP perfeito)
             if acc[0] == b'*' {
                 match parse_resp_one(&acc) {
                     Ok(Some((parts, consumed))) => {
-                        let response = parser::process_parts(parts, &db).await;
-                        let _ = stream.write_all(response.as_bytes()).await;
+                        let resp = parser::process_parts(parts, &db).await;
+                        let bytes = resp.to_bytes();
+                        let _ = stream.write_all(&bytes).await;
 
-                        // remove só o que foi consumido e continua (pipeline!)
                         acc.drain(..consumed);
                         continue;
                     }
                     Ok(None) => {
-                        // precisa de mais bytes
                         break;
                     }
                     Err(e) => {
@@ -48,7 +45,6 @@ pub async fn handle(mut stream: TcpStream, db: Db) {
                     }
                 }
             } else {
-                // opcional: manter plain text debug (line-based)
                 if let Some(pos) = acc.iter().position(|&b| b == b'\n') {
                     let line_bytes = acc[..pos].to_vec();
                     acc.drain(..pos + 1);
