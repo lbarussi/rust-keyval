@@ -3,85 +3,65 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::db::storage::Db;
 use crate::protocol::parser;
-use crate::protocol::resp::parser::parse_resp;
+use crate::protocol::resp::parser::parse_resp_one;
 
 pub async fn handle(mut stream: TcpStream, db: Db) {
-
-    let mut buffer = [0; 1024];
-    let mut acc = String::new();
+    let mut buffer = [0u8; 4096];
+    let mut acc: Vec<u8> = Vec::new();
 
     loop {
-
         let n = match stream.read(&mut buffer).await {
             Ok(0) => return,
             Ok(n) => n,
             Err(_) => return,
         };
 
-        let incoming = String::from_utf8_lossy(&buffer[..n]);
-        println!("READ >>> {:?}", incoming);
+        acc.extend_from_slice(&buffer[..n]);
 
-        acc.push_str(&incoming);
-        println!("ACC >>> {:?}", acc);
-
+        // Processa QUANTOS comandos completos existirem dentro do buffer
         loop {
-
-            if acc.starts_with('*') {
-
-                println!("PROTO >>> RESP detected");
-
-                if !acc.ends_with("\r\n") {
-                    println!("WAIT >>> RESP not complete yet");
-                    break;
-                }
-
-                println!("RESP >>> Trying parse");
-
-                let parts: Vec<String> = parse_resp(&acc.trim());
-                println!("PARTS >>> {:?}", parts);
-
-                if parts.is_empty() {
-                    println!("WARN >>> Empty parts, waiting more data");
-                    break;
-                }
-
-                let normalized_input = parts.join(" ");
-                println!("PROCESS >>> {}", normalized_input);
-
-                let response = parser::process(normalized_input, &db).await;
-                println!("RESPONSE >>> {:?}", response);
-
-                let _ = stream.write_all(response.as_bytes()).await;
-
-                println!("ACC >>> cleared");
-                acc = String::new();
-
+            if acc.is_empty() {
                 break;
             }
 
-            if let Some(pos) = acc.find('\n') {
+            // RESP only (prioridade RESP perfeito)
+            if acc[0] == b'*' {
+                match parse_resp_one(&acc) {
+                    Ok(Some((parts, consumed))) => {
+                        let response = parser::process_parts(parts, &db).await;
+                        let _ = stream.write_all(response.as_bytes()).await;
 
-                println!("PROTO >>> Plain text detected");
-
-                let line = acc[..pos].trim().to_string();
-                acc = acc[pos + 1..].to_string();
-
-                println!("LINE >>> {:?}", line);
-                println!("ACC REMAIN >>> {:?}", acc);
-
-                if !line.is_empty() {
-
-                    println!("PROCESS >>> {}", line);
-
-                    let response = parser::process(line, &db).await;
-                    println!("RESPONSE >>> {:?}", response);
-
-                    let _ = stream.write_all(response.as_bytes()).await;
+                        // remove só o que foi consumido e continua (pipeline!)
+                        acc.drain(..consumed);
+                        continue;
+                    }
+                    Ok(None) => {
+                        // precisa de mais bytes
+                        break;
+                    }
+                    Err(e) => {
+                        let _ = stream
+                            .write_all(format!("ERR {}\n", e).as_bytes())
+                            .await;
+                        acc.clear();
+                        break;
+                    }
                 }
-
             } else {
-                println!("WAIT >>> Need more data");
-                break;
+                // opcional: manter plain text debug (line-based)
+                if let Some(pos) = acc.iter().position(|&b| b == b'\n') {
+                    let line_bytes = acc[..pos].to_vec();
+                    acc.drain(..pos + 1);
+
+                    let line = String::from_utf8_lossy(&line_bytes).trim().to_string();
+                    if !line.is_empty() {
+                        let response = parser::process(line, &db).await;
+                        let _ = stream.write_all(response.as_bytes()).await;
+                    }
+                    continue;
+                } else {
+                    break;
+                }
             }
         }
     }

@@ -1,8 +1,7 @@
 use crate::db::storage::Db;
 
-pub async fn execute(_parts: Vec<&str>, db: &Db) -> String {
+pub async fn execute(_parts: Vec<String>, db: &Db) -> String {
     let db = db.lock().await;
-    let keys = db.keys().cloned().collect::<Vec<_>>().join(" ");
-
-    return format!("{}/n", keys);
+    let keys = db.keys().cloned().collect::<Vec<_>>().join(", ");
+    format!("{}\n", keys)
 }

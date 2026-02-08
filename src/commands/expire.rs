@@ -1,20 +1,21 @@
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use crate::db::storage::Db;
 
-pub async fn execute(parts: Vec<&str>, db: &Db) -> String {
+pub async fn execute(parts: Vec<String>, db: &Db) -> String {
     if parts.len() < 3 {
         return "ERR usage EXPIRE key seconds\n".into();
     }
 
-    let seconds = match parts[2].parse::<u64>() {
+    let key = &parts[1];
+    let seconds: u64 = match parts[2].parse() {
         Ok(v) => v,
         Err(_) => return "ERR invalid seconds\n".into(),
     };
 
     let mut db = db.lock().await;
 
-    if let Some(entry) = db.get_mut(parts[1]) {
+    if let Some(entry) = db.get_mut(key) {
         entry.expire_at = Some(Instant::now() + Duration::from_secs(seconds));
         return "1\n".into();
     }

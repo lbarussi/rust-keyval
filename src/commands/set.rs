@@ -1,12 +1,16 @@
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use crate::db::storage::Db;
 use crate::db::value::ValueEntry;
 
-pub async fn execute(parts: Vec<&str>, db: &Db) -> String {
+pub async fn execute(parts: Vec<String>, db: &Db) -> String {
+    // parts: ["SET", "key", "value", ...]
     if parts.len() < 3 {
         return "ERR usage SET key value [EX seconds]\n".into();
     }
+
+    let key = parts[1].clone();
+    let value = parts[2].clone(); // ✅ pode ser ""
 
     let mut expire = None;
 
@@ -17,11 +21,10 @@ pub async fn execute(parts: Vec<&str>, db: &Db) -> String {
     }
 
     let mut db = db.lock().await;
-
     db.insert(
-        parts[1].into(),
+        key,
         ValueEntry {
-            value: parts[2].into(),
+            value,
             expire_at: expire,
         },
     );

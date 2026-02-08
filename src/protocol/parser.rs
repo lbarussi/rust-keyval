@@ -2,8 +2,15 @@ use crate::commands;
 use crate::db::storage::Db;
 
 pub async fn process(input: String, db: &Db) -> String {
-    let parts: Vec<&str> = input.split_whitespace().collect();
+    let parts: Vec<String> = input
+        .split_whitespace()
+        .map(|s| s.to_string())
+        .collect();
 
+    process_parts(parts, db).await
+}
+
+pub async fn process_parts(parts: Vec<String>, db: &Db) -> String {
     if parts.is_empty() {
         return "ERR empty command\n".into();
     }
@@ -18,7 +25,6 @@ pub async fn process(input: String, db: &Db) -> String {
         "FLUSHALL" => commands::flushall::execute(parts, db).await,
         "INCR" => commands::incr::execute(parts, db).await,
         "EXPIRE" => commands::expire::execute(parts, db).await,
-
         _ => "ERR unknown command\n".into(),
     }
 }

@@ -3,23 +3,24 @@ use std::time::Instant;
 use crate::db::storage::Db;
 use crate::db::value::ValueEntry;
 
-pub async fn execute(parts: Vec<&str>, db: &Db) -> String {
-
+pub async fn execute(parts: Vec<String>, db: &Db) -> String {
     if parts.len() < 2 {
         return "ERR usage INCR key\n".into();
     }
 
+    let key = parts[1].clone();
     let mut db = db.lock().await;
 
-    if let Some(entry) = db.get(parts[1]) {
+    // Lazy expire: se expirou, remove antes de incrementar
+    if let Some(entry) = db.get(&key) {
         if let Some(exp) = entry.expire_at {
             if Instant::now() > exp {
-                db.remove(parts[1]);
+                db.remove(&key);
             }
         }
     }
 
-    let entry: &mut ValueEntry = db.entry(parts[1].into()).or_insert(ValueEntry {
+    let entry = db.entry(key).or_insert(ValueEntry {
         value: "0".into(),
         expire_at: None,
     });
